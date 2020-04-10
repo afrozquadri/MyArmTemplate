@@ -1,0 +1,37 @@
+{
+    "$schema": "https://schema.management.azure.com/schemas/2015-01-01/deploymentParameters.json#",
+    "contentVersion": "1.0.0.0",
+    "parameters": {
+        "appservicename": {
+            "value": "lrsb-co2verifier-serviceplan"
+        },
+        "webappnames_slots": {
+            "value": [
+                "lrsb-co2verifier-webapp-prod*staging"
+            ]
+        },
+        "webappnames": {
+            "value": [
+                "lrsb-co2verifier-webapp-prod"
+            ]
+        },
+        "environment": {
+            "value": "prod"
+        },
+        "costcenter": {
+            "value": "LRSB"
+        },
+        "owner": {
+            "value": "LRSB"
+        },
+        "appinsight": {
+            "value": "no"
+        },
+        "workersize": {
+            "value": "0"
+        },
+        "webappsku": {
+            "value": "Standard"
+        }
+    }
+}
