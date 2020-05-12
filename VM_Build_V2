@@ -1,0 +1,224 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "vmName": {
+      "type": "string",
+      "metadata": {
+        "description": "Name of the VM"
+      }
+    },
+    "osType": {
+      "type": "string",
+      "allowedValues": [
+        "Windows",
+        "Linux"
+      ],
+      "metadata": {
+        "description": "Type of OS on the existing vhd"
+      }
+    },
+    "adminUsername": {
+      "type": "string",
+      "metadata": {
+        "description": "Username for the Virtual Machine."
+      }
+    },
+    "adminPassword": {
+      "type": "SecureString",
+      "metadata": {
+        "description": "Password for the Virtual Machine."
+      }
+    },
+    "AvailabilitySetsName": {
+      "type": "string",
+      "metadata": {
+        "description": "Existing availability Set Name where the VM will be placed"
+      }
+    },
+    "galleryName": {
+      "type": "string",
+      "metadata": {
+        "description": "Name of the Shared Image Gallery."
+      }
+    },
+    "galleryImageDefinitionName": {
+      "type": "string",
+      "metadata": {
+        "description": "Name of the Image Definition."
+      }
+    },
+    "galleryImageVersionName": {
+      "type": "string",
+      "metadata": {
+        "description": "Name of the Image Version - should follow <MajorVersion>.<MinorVersion>.<Patch>."
+      }
+    },
+    "vmSize": {
+      "type": "string",
+      "allowedValues": [
+        "Standard_D2s_v3",
+        "Standard_DS2_v2",
+        "Standard_B2s",
+        "Standard_B2ms"
+      ],
+      "metadata": {
+        "description": "Size of the VM"
+      }
+    },
+    "existingVirtualNetworkName": {
+      "type": "string",
+      "metadata": {
+        "description": "Name of the existing VNET"
+      }
+    },
+    "existingVirtualNetworkResourceGroup": {
+      "type": "string",
+      "defaultValue": "[resourceGroup().name]",
+      "metadata": {
+        "description": "Name of the existing VNET resource group"
+      }
+    },
+    "subnetName": {
+      "type": "string",
+      "metadata": {
+        "description": "Name of the subnet in the virtual network you want to use"
+      }
+    },
+    "Job_Code Tag": {
+      "type": "string"
+    },
+    "Owner Tag": {
+      "type": "string"
+    },
+    "domainJoinUserName": {
+      "type": "string",
+      "metadata": {
+        "description": "Domain NetBiosName plus User name of a domain user with sufficient rights to perfom domain join operation. E.g. domain\\username"
+      }
+    },
+    "domainJoinUserPassword": {
+      "type": "securestring",
+      "metadata": {
+        "description": "Domain user password"
+      }
+    },
+    "domainFQDN": {
+      "type": "string",
+      "metadata": {
+        "description": "Domain FQDN where the virtual machine will be joined"
+      }
+    },
+    "ouPath": {
+      "type": "string",
+      "defaultValue": "",
+      "metadata": {
+        "description": "Specifies an organizational unit (OU) for the domain account. Enter the full distinguished name of the OU in quotation marks. Example: \"OU=testOU; DC=domain; DC=Domain; DC=com\""
+      }
+    },
+    "location": {
+      "type": "string",
+      "defaultValue": "[resourceGroup().location]",
+      "metadata": {
+        "description": "Location for all resources."
+      }
+    }
+  },
+
+  "variables": {
+    "subnetRef": "[resourceId(parameters('existingVirtualNetworkResourceGroup'), 'Microsoft.Network/virtualNetworks/subnets', parameters('existingVirtualNetworkName'),  parameters('subnetName'))]",
+    "nicName": "[concat(parameters('vmName'), '-nic')]",
+    "domainJoinOptions": 3
+  },
+  "resources": [
+    {
+      "apiVersion": "2019-07-01",
+      "type": "Microsoft.Network/networkInterfaces",
+      "name": "[variables('nicName')]",
+      "location": "[parameters('location')]",
+      "tags": {
+        "Job_Code": "[parameters('Job_Code Tag')]",
+        "Owner": "[parameters('Owner Tag')]"
+      },
+      "properties": {
+        "ipConfigurations": [
+          {
+            "name": "ipconfig1",
+            "properties": {
+              "privateIPAllocationMethod": "Dynamic",
+              "subnet": {
+                "id": "[variables('subnetRef')]"
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "type": "Microsoft.Compute/virtualMachines",
+      "name": "[parameters('vmName')]",
+      "apiVersion": "2019-07-01",
+      "location": "[resourceGroup().location]",
+      "tags": {
+        "Job_Code": "[parameters('Job_Code Tag')]",
+        "Owner": "[parameters('Owner Tag')]"
+      },
+      "properties": {
+        "hardwareProfile": {
+          "vmSize": "[parameters('vmSize')]"
+        },
+        "osProfile": {
+          "computerName": "[parameters('vmName')]",
+          "adminUsername": "[parameters('adminUsername')]",
+          "adminPassword": "[parameters('adminPassword')]"
+        },
+        "storageProfile": {
+          "imageReference": {
+            "id": "[resourceId('Microsoft.Compute/galleries/images/versions', parameters('galleryName'), parameters('galleryImageDefinitionName'), parameters('galleryImageVersionName'))]"
+          }
+        },
+        "licenseType": "Windows_Server",
+        "availabilitySet": {
+          "id": "[resourceId('Microsoft.Compute/availabilitySets', parameters('AvailabilitySetsName'))]"
+        },
+        "networkProfile": {
+          "networkInterfaces": [
+            {
+              "id": "[resourceId('Microsoft.Network/networkInterfaces',variables('nicName'))]"
+            }
+          ]
+        }
+      },
+
+      "dependsOn": [
+        "[resourceId('Microsoft.Network/networkInterfaces/', variables('nicName'))]"
+      ]
+
+    },
+    {
+      "apiVersion": "2019-07-01",
+      "type": "Microsoft.Compute/virtualMachines/extensions",
+      "name": "[concat(parameters('vmname'),'/joindomain')]",
+      "location": "[parameters('location')]",
+      "dependsOn": [
+        "[concat('Microsoft.Compute/virtualMachines/', parameters('vmname'))]"
+      ],
+      "properties": {
+        "publisher": "Microsoft.Compute",
+        "type": "JsonADDomainExtension",
+        "typeHandlerVersion": "1.3",
+        "autoUpgradeMinorVersion": true,
+        "settings": {
+          "Name": "[parameters('domainFQDN')]",
+          "User": "[concat(parameters('domainFQDN'), '\\', parameters('domainJoinUserName'))]",
+          "Restart": "true",
+          "Options": "[variables('domainJoinOptions')]",
+          "OUPath": "[parameters('ouPath')]"
+        },
+        "protectedSettings": {
+          "Password": "[parameters('domainJoinUserPassword')]"
+        }
+      }
+    }
+  ]
+}
